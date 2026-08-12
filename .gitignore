@@ -147,6 +147,10 @@ activemq-data/
 # SageMath parsed files
 *.sage.py
 
+# qa-swarm per-run output (diffs, logs)
+runs/*
+!runs/.gitkeep
+
 # Environments
 .env
 .envrc
