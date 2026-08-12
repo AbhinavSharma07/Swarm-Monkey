@@ -20,3 +20,48 @@ In traditional environments, test coverage is limited by the developer’s abili
 
 The ecosystem relies heavily on non-linear, cyclic state machines. If an agent fails to engineer a functional code patch, the orchestrator automatically intercepts the runtime error and loops the task back through the graph for another evaluation phase.
 
+```
+Aggressor ──> Detective ──(silent mutant, retries left)──> back to Aggressor
+                  │
+            (failure captured)
+                  ▼
+               Surgeon ──(internal retry loop, feeds back prior failure)
+                  │
+            (patch validated)              (retries exhausted)
+                  ▼                              ▼
+        branch + runs/<id>/patch.diff      cycle marked unresolved
+```
+
+---
+
+## 🚦 Status
+
+The current implementation is a working MVP of the core loop, run against a small
+bundled sample microservice rather than an arbitrary external repo:
+
+- **Aggressor** mutates real Python source via `ast` (relational-operator swap, boundary
+  shift, boolean-operator swap, condition negation) — not yet the full AST-transform catalog.
+- **Detective** runs the target's pytest suite in an isolated `git worktree` and, on
+  failure, asks an LLM to synthesize a confirming regression test.
+- **Surgeon** asks an LLM to patch the bug, validates against the full suite + the new
+  regression test, and retries with feedback up to `MAX_SURGEON_RETRIES` times.
+- Successful cycles are committed to a local branch (`qa-swarm/fix-<run_id>`) plus a
+  `runs/<run_id>/patch.diff` file — **no GitHub PR automation yet**, that's a planned
+  next step once the core loop has seen more mileage.
+
+## 🚀 Getting Started
+
+```bash
+pip install -e .
+cp .env.example .env   # set LLM_PROVIDER + the matching API key
+python -m qa_swarm run --target ./sample_app --cycles 3
+```
+
+Each cycle prints a log of what the Aggressor injected, whether the Detective caught it,
+and whether the Surgeon produced a validated fix. Run the test suites with:
+
+```bash
+pytest sample_app/tests   # the victim app's own baseline suite
+pytest tests               # qa_swarm's own unit tests
+```
+
