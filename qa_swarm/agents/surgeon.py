@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import difflib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -7,7 +8,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from qa_swarm.agents.aggressor import Mutation
 from qa_swarm.agents.detective import RegressionTest, TestReport, run_pytest
-from qa_swarm.llm import get_llm
+from qa_swarm.llm import get_llm, invoke_with_retry
 
 
 @dataclass
@@ -53,10 +54,15 @@ def generate_patch(
             f"```python\n{previous_attempt.patched_source}\n```\n"
             f"Failure after that attempt:\n```\n{previous_attempt.test_report.output}\n```\n"
         )
-    response = llm.invoke(
-        [SystemMessage(content=SURGEON_SYSTEM_PROMPT), HumanMessage(content=context)]
+    response = invoke_with_retry(
+        llm, [SystemMessage(content=SURGEON_SYSTEM_PROMPT), HumanMessage(content=context)]
     )
     return _strip_code_fences(response.content)
+
+
+def change_ratio(before: str, after: str) -> float:
+    matcher = difflib.SequenceMatcher(a=before.splitlines(), b=after.splitlines())
+    return 1 - matcher.ratio()
 
 
 def apply_and_validate(
@@ -65,7 +71,19 @@ def apply_and_validate(
     test_target: str,
     regression_test: RegressionTest,
     patched_source: str,
+    max_change_ratio: float = 0.5,
 ) -> PatchAttempt:
+    ratio = change_ratio(mutation.mutated_source, patched_source)
+    if ratio > max_change_ratio:
+        rejected_report = TestReport(
+            passed=False,
+            output=(
+                f"Patch rejected before testing: changed {ratio:.0%} of the file, "
+                f"exceeding the {max_change_ratio:.0%} safety limit."
+            ),
+        )
+        return PatchAttempt(patched_source=patched_source, validated=False, test_report=rejected_report)
+
     mutation.file.write_text(patched_source, encoding="utf-8")
     suite_report = run_pytest(worktree_root, test_target)
     regression_report = run_pytest(
@@ -86,12 +104,15 @@ def heal(
     test_report: TestReport,
     regression_test: RegressionTest,
     max_retries: int,
+    max_change_ratio: float = 0.5,
 ) -> PatchAttempt:
     attempt: PatchAttempt | None = None
     current_report = test_report
     for _ in range(max_retries):
         patched_source = generate_patch(mutation, current_report, regression_test, attempt)
-        attempt = apply_and_validate(worktree_root, mutation, test_target, regression_test, patched_source)
+        attempt = apply_and_validate(
+            worktree_root, mutation, test_target, regression_test, patched_source, max_change_ratio
+        )
         if attempt.validated:
             return attempt
         current_report = attempt.test_report

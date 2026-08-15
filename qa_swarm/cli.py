@@ -17,7 +17,13 @@ def _repo_root() -> Path:
     return Path(result.stdout.strip())
 
 
-def run_command(target: str, cycles: int) -> None:
+def run_command(
+    target: str,
+    cycles: int,
+    app_dir: str = "app",
+    tests_dir: str = "tests",
+    exclude_files: frozenset[str] | None = None,
+) -> None:
     repo_root = _repo_root()
     target_path = Path(target)
     if not target_path.is_absolute():
@@ -31,12 +37,14 @@ def run_command(target: str, cycles: int) -> None:
         sandbox = Sandbox.create(
             repo_root=repo_root, run_id=run_id, runs_dir=repo_root / settings.runs_dir
         )
-        app_root = sandbox.path_for(target_rel / "app")
-        test_target = (target_rel / "tests").as_posix()
-        regression_dir = sandbox.path_for(target_rel / "tests")
+        app_root = sandbox.path_for(target_rel / app_dir)
+        test_target = (target_rel / tests_dir).as_posix()
+        regression_dir = sandbox.path_for(target_rel / tests_dir)
 
         try:
-            final_state = run_cycle(sandbox, app_root, test_target, regression_dir, settings)
+            final_state = run_cycle(
+                sandbox, app_root, test_target, regression_dir, settings, exclude_files=exclude_files
+            )
         except Exception:
             sandbox.cleanup(remove_branch=True)
             raise
@@ -64,14 +72,30 @@ def main() -> None:
         "run", help="Run one or more Aggressor/Detective/Surgeon cycles against a target app"
     )
     run_parser.add_argument(
-        "--target", required=True, help="Path to the target app (containing app/ and tests/ dirs)"
+        "--target", required=True, help="Path to the target repo/app to mutate and test"
     )
     run_parser.add_argument("--cycles", type=int, default=1, help="Number of mutation cycles to run")
+    run_parser.add_argument(
+        "--app-dir", default="app", help="Path (relative to --target) containing the source to mutate"
+    )
+    run_parser.add_argument(
+        "--tests-dir", default="tests", help="Path (relative to --target) containing the test suite"
+    )
+    run_parser.add_argument(
+        "--exclude-files",
+        default=None,
+        help="Comma-separated filenames to never mutate (default: __init__.py,main.py)",
+    )
 
     args = parser.parse_args()
 
     if args.command == "run":
-        run_command(args.target, args.cycles)
+        exclude_files = (
+            frozenset(name.strip() for name in args.exclude_files.split(","))
+            if args.exclude_files
+            else None
+        )
+        run_command(args.target, args.cycles, args.app_dir, args.tests_dir, exclude_files)
 
 
 if __name__ == "__main__":

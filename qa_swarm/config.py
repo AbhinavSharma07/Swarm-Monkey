@@ -14,6 +14,7 @@ class Settings:
     llm_model: str = os.getenv("LLM_MODEL", "claude-sonnet-5")
     max_surgeon_retries: int = int(os.getenv("MAX_SURGEON_RETRIES", "3"))
     max_aggressor_retries: int = int(os.getenv("MAX_AGGRESSOR_RETRIES", "5"))
+    max_patch_change_ratio: float = float(os.getenv("MAX_PATCH_CHANGE_RATIO", "0.5"))
     runs_dir: str = os.getenv("QA_SWARM_RUNS_DIR", "runs")
 
 

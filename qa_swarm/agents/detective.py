@@ -7,7 +7,7 @@ from pathlib import Path
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from qa_swarm.agents.aggressor import Mutation
-from qa_swarm.llm import get_llm
+from qa_swarm.llm import get_llm, invoke_with_retry
 
 
 @dataclass
@@ -61,8 +61,8 @@ def synthesize_regression_test(mutation: Mutation, test_report: TestReport, impo
         f"pytest failure output:\n```\n{test_report.output}\n```\n\n"
         f"Import the mutated module as `{import_path}`. Write the new test function now."
     )
-    response = llm.invoke(
-        [SystemMessage(content=REGRESSION_TEST_SYSTEM_PROMPT), HumanMessage(content=prompt)]
+    response = invoke_with_retry(
+        llm, [SystemMessage(content=REGRESSION_TEST_SYSTEM_PROMPT), HumanMessage(content=prompt)]
     )
     return _strip_code_fences(response.content)
 

@@ -12,7 +12,12 @@ from qa_swarm.state import SwarmState
 
 
 def aggressor_node(state: SwarmState) -> dict:
-    mutation = aggressor.mutate(state["app_root"], state["rng"], exclude=state["tried_mutations"])
+    mutation = aggressor.mutate(
+        state["app_root"],
+        state["rng"],
+        exclude=state["tried_mutations"],
+        exclude_files=state.get("exclude_files"),
+    )
     log = state["log"] + []
 
     if mutation is None:
@@ -85,6 +90,7 @@ def surgeon_node(state: SwarmState) -> dict:
         test_report=detective_result.test_report,
         regression_test=detective_result.regression_test,
         max_retries=state["max_surgeon_retries"],
+        max_change_ratio=state["max_patch_change_ratio"],
     )
 
     if attempt.validated:
@@ -131,6 +137,7 @@ def run_cycle(
     test_target: str,
     regression_dir: Path,
     settings: Settings,
+    exclude_files: frozenset[str] | None = None,
 ) -> SwarmState:
     initial_state: SwarmState = {
         "run_id": sandbox.run_id,
@@ -139,8 +146,10 @@ def run_cycle(
         "app_root": app_root,
         "test_target": test_target,
         "regression_dir": regression_dir,
+        "exclude_files": exclude_files,
         "max_aggressor_retries": settings.max_aggressor_retries,
         "max_surgeon_retries": settings.max_surgeon_retries,
+        "max_patch_change_ratio": settings.max_patch_change_ratio,
         "tried_mutations": frozenset(),
         "aggressor_attempts": 0,
         "mutation": None,

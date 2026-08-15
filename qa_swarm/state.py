@@ -17,8 +17,10 @@ class SwarmState(TypedDict, total=False):
     app_root: Path
     test_target: str
     regression_dir: Path
+    exclude_files: frozenset[str] | None
     max_aggressor_retries: int
     max_surgeon_retries: int
+    max_patch_change_ratio: float
 
     tried_mutations: frozenset
     aggressor_attempts: int
