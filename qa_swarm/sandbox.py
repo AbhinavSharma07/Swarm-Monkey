@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import subprocess
+import threading
 from dataclasses import dataclass
 from pathlib import Path
+
+_WORKTREE_LOCK = threading.Lock()
 
 
 def _run_git(args: list[str], cwd: Path) -> str:
@@ -26,10 +29,11 @@ class Sandbox:
         worktree_path = (runs_dir / run_id / "worktree").resolve()
         worktree_path.parent.mkdir(parents=True, exist_ok=True)
         base_commit = _run_git(["rev-parse", "HEAD"], cwd=repo_root).strip()
-        _run_git(
-            ["worktree", "add", "-b", branch, str(worktree_path), base_commit],
-            cwd=repo_root,
-        )
+        with _WORKTREE_LOCK:
+            _run_git(
+                ["worktree", "add", "-b", branch, str(worktree_path), base_commit],
+                cwd=repo_root,
+            )
         return cls(
             repo_root=repo_root,
             run_id=run_id,
@@ -63,6 +67,7 @@ class Sandbox:
         _run_git(["clean", "-fd"], cwd=self.worktree_path)
 
     def cleanup(self, remove_branch: bool = False) -> None:
-        _run_git(["worktree", "remove", "--force", str(self.worktree_path)], cwd=self.repo_root)
-        if remove_branch:
-            _run_git(["branch", "-D", self.branch], cwd=self.repo_root)
+        with _WORKTREE_LOCK:
+            _run_git(["worktree", "remove", "--force", str(self.worktree_path)], cwd=self.repo_root)
+            if remove_branch:
+                _run_git(["branch", "-D", self.branch], cwd=self.repo_root)

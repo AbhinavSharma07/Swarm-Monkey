@@ -12,7 +12,12 @@ from qa_swarm.state import SwarmState
 
 
 def aggressor_node(state: SwarmState) -> dict:
-    mutation = aggressor.mutate(state["app_root"], state["rng"], exclude=state["tried_mutations"])
+    mutation = aggressor.mutate(
+        state["app_root"],
+        state["rng"],
+        exclude=state["tried_mutations"],
+        exclude_files=state.get("exclude_files"),
+    )
     log = state["log"] + []
 
     if mutation is None:
@@ -46,6 +51,7 @@ def detective_node(state: SwarmState) -> dict:
         regression_dir=state["regression_dir"],
         mutation=mutation,
         run_id=state["run_id"],
+        telemetry_config=state.get("telemetry_config"),
     )
 
     if not result.mutant_caught:
@@ -60,7 +66,10 @@ def detective_node(state: SwarmState) -> dict:
             "log": log,
         }
 
-    log.append(f"Detective: mutation caught. Regression test written to {result.regression_test.path}")
+    log.append(
+        f"Detective: mutation caught via {result.caught_via}. "
+        f"Regression test written to {result.regression_test.path}"
+    )
     return {"detective_result": result, "log": log}
 
 
@@ -85,6 +94,7 @@ def surgeon_node(state: SwarmState) -> dict:
         test_report=detective_result.test_report,
         regression_test=detective_result.regression_test,
         max_retries=state["max_surgeon_retries"],
+        max_change_ratio=state["max_patch_change_ratio"],
     )
 
     if attempt.validated:
@@ -131,6 +141,8 @@ def run_cycle(
     test_target: str,
     regression_dir: Path,
     settings: Settings,
+    exclude_files: frozenset[str] | None = None,
+    telemetry_config=None,
 ) -> SwarmState:
     initial_state: SwarmState = {
         "run_id": sandbox.run_id,
@@ -139,8 +151,11 @@ def run_cycle(
         "app_root": app_root,
         "test_target": test_target,
         "regression_dir": regression_dir,
+        "exclude_files": exclude_files,
+        "telemetry_config": telemetry_config,
         "max_aggressor_retries": settings.max_aggressor_retries,
         "max_surgeon_retries": settings.max_surgeon_retries,
+        "max_patch_change_ratio": settings.max_patch_change_ratio,
         "tried_mutations": frozenset(),
         "aggressor_attempts": 0,
         "mutation": None,
