@@ -27,6 +27,7 @@ class DetectiveResult:
     mutant_caught: bool
     test_report: TestReport
     regression_test: RegressionTest | None
+    caught_via: str | None = None
 
 
 def run_pytest(cwd: Path, target: str) -> TestReport:
@@ -90,8 +91,19 @@ def investigate(
     regression_dir: Path,
     mutation: Mutation,
     run_id: str,
+    telemetry_config=None,
 ) -> DetectiveResult:
     report = run_pytest(worktree_root, test_target)
+    caught_via = "pytest"
+
+    if report.passed and telemetry_config is not None:
+        from qa_swarm.telemetry import run_telemetry_check
+
+        telemetry_report = run_telemetry_check(worktree_root, regression_dir, telemetry_config)
+        if not telemetry_report.passed:
+            report = telemetry_report
+            caught_via = "telemetry"
+
     if report.passed:
         return DetectiveResult(mutant_caught=False, test_report=report, regression_test=None)
 
@@ -104,4 +116,6 @@ def investigate(
         regression_test.path.unlink(missing_ok=True)
         return DetectiveResult(mutant_caught=False, test_report=report, regression_test=None)
 
-    return DetectiveResult(mutant_caught=True, test_report=report, regression_test=regression_test)
+    return DetectiveResult(
+        mutant_caught=True, test_report=report, regression_test=regression_test, caught_via=caught_via
+    )

@@ -149,6 +149,38 @@ def test_arithmetic_operator_replacement_augassign():
     assert isinstance(mutated.operator, cst.SubtractAssign)
 
 
+def test_unary_operator_removal_drops_not():
+    module = cst.parse_module("not is_member\n")
+    unary = module.body[0].body[0].value
+    op = aggressor.UnaryOperatorRemoval()
+
+    assert op.is_candidate(unary)
+    mutated = op.apply(unary)
+
+    assert isinstance(mutated, cst.Name)
+    assert mutated.value == "is_member"
+
+
+def test_unary_operator_removal_drops_minus():
+    module = cst.parse_module("-value\n")
+    unary = module.body[0].body[0].value
+    op = aggressor.UnaryOperatorRemoval()
+
+    assert op.is_candidate(unary)
+    mutated = op.apply(unary)
+
+    assert isinstance(mutated, cst.Name)
+    assert mutated.value == "value"
+
+
+def test_unary_operator_removal_ignores_plus():
+    module = cst.parse_module("+value\n")
+    unary = module.body[0].body[0].value
+    op = aggressor.UnaryOperatorRemoval()
+
+    assert not op.is_candidate(unary)
+
+
 def test_mutate_returns_none_when_no_candidates(tmp_path):
     app_dir = tmp_path / "app"
     app_dir.mkdir()

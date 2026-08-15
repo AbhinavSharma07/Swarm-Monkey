@@ -1,0 +1,7 @@
+[
+    {"method": "POST", "path": "/quote", "json": {"quantity": 5, "unit_price": 10.0, "is_member": true}, "expect_status": 200},
+    {"method": "POST", "path": "/quote", "json": {"quantity": 100, "unit_price": 2.0, "is_member": false}, "expect_status": 200},
+    {"method": "POST", "path": "/quote", "json": {"quantity": 0, "unit_price": 10.0}, "expect_status": 400},
+    {"method": "POST", "path": "/quote", "json": {"quantity": -1, "unit_price": 10.0}, "expect_status": 400},
+    {"method": "POST", "path": "/quote", "json": {"quantity": 1, "unit_price": -5.0}, "expect_status": 400}
+]

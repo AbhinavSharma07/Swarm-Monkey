@@ -51,6 +51,7 @@ def detective_node(state: SwarmState) -> dict:
         regression_dir=state["regression_dir"],
         mutation=mutation,
         run_id=state["run_id"],
+        telemetry_config=state.get("telemetry_config"),
     )
 
     if not result.mutant_caught:
@@ -65,7 +66,10 @@ def detective_node(state: SwarmState) -> dict:
             "log": log,
         }
 
-    log.append(f"Detective: mutation caught. Regression test written to {result.regression_test.path}")
+    log.append(
+        f"Detective: mutation caught via {result.caught_via}. "
+        f"Regression test written to {result.regression_test.path}"
+    )
     return {"detective_result": result, "log": log}
 
 
@@ -138,6 +142,7 @@ def run_cycle(
     regression_dir: Path,
     settings: Settings,
     exclude_files: frozenset[str] | None = None,
+    telemetry_config=None,
 ) -> SwarmState:
     initial_state: SwarmState = {
         "run_id": sandbox.run_id,
@@ -147,6 +152,7 @@ def run_cycle(
         "test_target": test_target,
         "regression_dir": regression_dir,
         "exclude_files": exclude_files,
+        "telemetry_config": telemetry_config,
         "max_aggressor_retries": settings.max_aggressor_retries,
         "max_surgeon_retries": settings.max_surgeon_retries,
         "max_patch_change_ratio": settings.max_patch_change_ratio,

@@ -121,12 +121,23 @@ class ArithmeticOperatorReplacement:
         return node.with_changes(operator=new_operator)
 
 
+class UnaryOperatorRemoval:
+    name = "unary_operator_removal"
+
+    def is_candidate(self, node: cst.CSTNode) -> bool:
+        return isinstance(node, cst.UnaryOperation) and isinstance(node.operator, (cst.Not, cst.Minus))
+
+    def apply(self, node: cst.UnaryOperation) -> cst.BaseExpression:
+        return node.expression
+
+
 OPERATORS = [
     RelationalOperatorReplacement(),
     BoundaryShift(),
     BooleanOperatorSwap(),
     ConditionNegation(),
     ArithmeticOperatorReplacement(),
+    UnaryOperatorRemoval(),
 ]
 
 
