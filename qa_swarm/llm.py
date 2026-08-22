@@ -7,6 +7,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage
 
 from qa_swarm.config import settings
+from qa_swarm.cost import TokenUsage
 
 
 def invoke_with_retry(
@@ -15,11 +16,15 @@ def invoke_with_retry(
     max_attempts: int = 3,
     base_delay: float = 1.0,
     sleep: Callable[[float], None] = time.sleep,
+    usage: TokenUsage | None = None,
 ):
     last_exc: Exception | None = None
     for attempt in range(max_attempts):
         try:
-            return llm.invoke(messages)
+            response = llm.invoke(messages)
+            if usage is not None:
+                usage.add_from_response(response)
+            return response
         except Exception as exc:
             last_exc = exc
             if attempt < max_attempts - 1:

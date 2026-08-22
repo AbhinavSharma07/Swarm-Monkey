@@ -6,18 +6,24 @@ import subprocess
 from qa_swarm.agents.aggressor import Mutation
 from qa_swarm.sandbox import Sandbox
 
+NETWORK_TIMEOUT_SECONDS = 30
+
 
 def gh_available() -> bool:
     return shutil.which("gh") is not None
 
 
 def push_branch(sandbox: Sandbox) -> bool:
-    result = subprocess.run(
-        ["git", "push", "-u", "origin", sandbox.branch],
-        cwd=sandbox.worktree_path,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            ["git", "push", "-u", "origin", sandbox.branch],
+            cwd=sandbox.worktree_path,
+            capture_output=True,
+            text=True,
+            timeout=NETWORK_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired:
+        return False
     return result.returncode == 0
 
 
@@ -28,12 +34,16 @@ def open_pull_request(sandbox: Sandbox, mutation: Mutation, base: str = "main") 
         f"**Mutation caught:** {mutation.description}\n\n"
         f"**Run:** {sandbox.run_id}\n"
     )
-    result = subprocess.run(
-        ["gh", "pr", "create", "--title", title, "--body", body, "--base", base, "--head", sandbox.branch],
-        cwd=sandbox.worktree_path,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            ["gh", "pr", "create", "--title", title, "--body", body, "--base", base, "--head", sandbox.branch],
+            cwd=sandbox.worktree_path,
+            capture_output=True,
+            text=True,
+            timeout=NETWORK_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired:
+        return None
     if result.returncode != 0:
         return None
     return result.stdout.strip()

@@ -6,11 +6,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 _WORKTREE_LOCK = threading.Lock()
+GIT_TIMEOUT_SECONDS = 60
 
 
 def _run_git(args: list[str], cwd: Path) -> str:
     result = subprocess.run(
-        ["git", *args], cwd=cwd, capture_output=True, text=True, check=True
+        ["git", *args], cwd=cwd, capture_output=True, text=True, check=True, timeout=GIT_TIMEOUT_SECONDS
     )
     return result.stdout
 

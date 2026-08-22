@@ -1,5 +1,7 @@
 # 🐒 qa-swarm: Autonomous Multi-Agent Chaos Engineering & Mutation Testing Swarm
 
+[![Tests](https://github.com/AbhinavSharma07/Swarm-Monkey/actions/workflows/tests.yml/badge.svg)](https://github.com/AbhinavSharma07/Swarm-Monkey/actions/workflows/tests.yml)
+
 `qa-swarm` is a production-ready autonomous software quality assurance platform. It transforms traditional reactive software testing into an adversarial game. Utilizing a cyclic, multi-agent AI framework powered by **LangGraph**, the system proactively breaks, analyzes, and self-heals target microservices without human intervention. 
 
 Instead of waiting for engineers to write boilerplate tests or maintain brittle UI selectors, `qa-swarm` continuously hardens base applications, outputting production-ready GitHub Pull Requests that bundle logical source fixes along with deterministic regression test suites.

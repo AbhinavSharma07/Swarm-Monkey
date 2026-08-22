@@ -13,6 +13,8 @@ class CycleRecord:
     function: str | None
     file: str | None
     description: str | None
+    input_tokens: int = 0
+    output_tokens: int = 0
 
 
 def append_record(history_path: Path, record: CycleRecord) -> None:
@@ -49,6 +51,8 @@ def summarize(records: list[CycleRecord]) -> dict:
         "unresolved": unresolved,
         "mutation_score": (healed / total) if total else 0.0,
         "by_operator": by_operator,
+        "input_tokens": sum(r.input_tokens for r in records),
+        "output_tokens": sum(r.output_tokens for r in records),
     }
 
 
@@ -62,4 +66,10 @@ def format_summary(summary: dict) -> str:
         lines.append("By operator:")
         for operator, stats in sorted(summary["by_operator"].items()):
             lines.append(f"  {operator}: healed={stats['healed']} unresolved={stats['unresolved']}")
+    total_tokens = summary["input_tokens"] + summary["output_tokens"]
+    if total_tokens:
+        lines.append(
+            f"LLM tokens: {total_tokens:,} (input={summary['input_tokens']:,}, "
+            f"output={summary['output_tokens']:,})"
+        )
     return "\n".join(lines)

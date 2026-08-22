@@ -7,6 +7,7 @@ from langgraph.graph import END, StateGraph
 
 from qa_swarm.agents import aggressor, detective, surgeon
 from qa_swarm.config import Settings
+from qa_swarm.cost import TokenUsage
 from qa_swarm.sandbox import Sandbox
 from qa_swarm.state import SwarmState
 
@@ -45,6 +46,7 @@ def detective_node(state: SwarmState) -> dict:
     mutation = state["mutation"]
     log = state["log"] + []
 
+    usage = state["token_usage"]
     result = detective.investigate(
         worktree_root=sandbox.worktree_path,
         test_target=state["test_target"],
@@ -52,6 +54,7 @@ def detective_node(state: SwarmState) -> dict:
         mutation=mutation,
         run_id=state["run_id"],
         telemetry_config=state.get("telemetry_config"),
+        usage=usage,
     )
 
     if not result.mutant_caught:
@@ -63,6 +66,7 @@ def detective_node(state: SwarmState) -> dict:
         return {
             "detective_result": result,
             "tried_mutations": state["tried_mutations"] | {aggressor.mutation_key(mutation)},
+            "token_usage": usage,
             "log": log,
         }
 
@@ -70,7 +74,7 @@ def detective_node(state: SwarmState) -> dict:
         f"Detective: mutation caught via {result.caught_via}. "
         f"Regression test written to {result.regression_test.path}"
     )
-    return {"detective_result": result, "log": log}
+    return {"detective_result": result, "token_usage": usage, "log": log}
 
 
 def route_after_detective(state: SwarmState) -> str:
@@ -87,6 +91,7 @@ def surgeon_node(state: SwarmState) -> dict:
     detective_result = state["detective_result"]
     log = state["log"] + []
 
+    usage = state["token_usage"]
     attempt = surgeon.heal(
         worktree_root=sandbox.worktree_path,
         mutation=mutation,
@@ -95,6 +100,7 @@ def surgeon_node(state: SwarmState) -> dict:
         regression_test=detective_result.regression_test,
         max_retries=state["max_surgeon_retries"],
         max_change_ratio=state["max_patch_change_ratio"],
+        usage=usage,
     )
 
     if attempt.validated:
@@ -102,10 +108,10 @@ def surgeon_node(state: SwarmState) -> dict:
             f"surgeon: fix {mutation.operator} in {mutation.function}() + add regression test"
         )
         log.append("Surgeon: patch validated and committed.")
-        return {"surgeon_attempt": attempt, "status": "healed", "log": log}
+        return {"surgeon_attempt": attempt, "token_usage": usage, "status": "healed", "log": log}
 
     log.append("Surgeon: exhausted retries without a validated patch.")
-    return {"surgeon_attempt": attempt, "status": "unresolved", "log": log}
+    return {"surgeon_attempt": attempt, "token_usage": usage, "status": "unresolved", "log": log}
 
 
 def give_up_node(state: SwarmState) -> dict:
@@ -153,6 +159,7 @@ def run_cycle(
         "regression_dir": regression_dir,
         "exclude_files": exclude_files,
         "telemetry_config": telemetry_config,
+        "token_usage": TokenUsage(),
         "max_aggressor_retries": settings.max_aggressor_retries,
         "max_surgeon_retries": settings.max_surgeon_retries,
         "max_patch_change_ratio": settings.max_patch_change_ratio,

@@ -30,13 +30,20 @@ class DetectiveResult:
     caught_via: str | None = None
 
 
-def run_pytest(cwd: Path, target: str) -> TestReport:
-    result = subprocess.run(
-        ["python", "-m", "pytest", target, "-q"],
-        cwd=cwd,
-        capture_output=True,
-        text=True,
-    )
+PYTEST_TIMEOUT_SECONDS = 120
+
+
+def run_pytest(cwd: Path, target: str, timeout: int = PYTEST_TIMEOUT_SECONDS) -> TestReport:
+    try:
+        result = subprocess.run(
+            ["python", "-m", "pytest", target, "-q"],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return TestReport(passed=False, output=f"pytest timed out after {timeout}s (possible infinite loop)")
     return TestReport(passed=result.returncode == 0, output=result.stdout + result.stderr)
 
 
@@ -53,7 +60,9 @@ behavior, matching the original function's intent). Return ONLY the Python code 
 test function (plus any needed imports), no prose, no markdown fences."""
 
 
-def synthesize_regression_test(mutation: Mutation, test_report: TestReport, import_path: str) -> str:
+def synthesize_regression_test(
+    mutation: Mutation, test_report: TestReport, import_path: str, usage=None
+) -> str:
     llm = get_llm()
     prompt = (
         f"Original source:\n```python\n{mutation.original_source}\n```\n\n"
@@ -63,7 +72,9 @@ def synthesize_regression_test(mutation: Mutation, test_report: TestReport, impo
         f"Import the mutated module as `{import_path}`. Write the new test function now."
     )
     response = invoke_with_retry(
-        llm, [SystemMessage(content=REGRESSION_TEST_SYSTEM_PROMPT), HumanMessage(content=prompt)]
+        llm,
+        [SystemMessage(content=REGRESSION_TEST_SYSTEM_PROMPT), HumanMessage(content=prompt)],
+        usage=usage,
     )
     return _strip_code_fences(response.content)
 
@@ -92,6 +103,7 @@ def investigate(
     mutation: Mutation,
     run_id: str,
     telemetry_config=None,
+    usage=None,
 ) -> DetectiveResult:
     report = run_pytest(worktree_root, test_target)
     caught_via = "pytest"
@@ -108,7 +120,7 @@ def investigate(
         return DetectiveResult(mutant_caught=False, test_report=report, regression_test=None)
 
     import_path = module_import_path(worktree_root, mutation.file)
-    code = synthesize_regression_test(mutation, report, import_path)
+    code = synthesize_regression_test(mutation, report, import_path, usage=usage)
     regression_test = write_regression_test(regression_dir, run_id, code)
 
     confirm = run_pytest(worktree_root, str(regression_test.path.relative_to(worktree_root)))

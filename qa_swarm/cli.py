@@ -15,7 +15,7 @@ from qa_swarm.telemetry import discover_telemetry_config
 
 def _repo_root() -> Path:
     result = subprocess.run(
-        ["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True, check=True
+        ["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True, check=True, timeout=30
     )
     return Path(result.stdout.strip())
 
@@ -61,6 +61,7 @@ def _run_one_cycle(
         lines.append(f"  {line}")
 
     mutation = final_state.get("mutation")
+    usage = final_state.get("token_usage")
     history_path = repo_root / settings.runs_dir / "history.jsonl"
     report.append_record(
         history_path,
@@ -71,6 +72,8 @@ def _run_one_cycle(
             function=mutation.function if mutation else None,
             file=str(mutation.file) if mutation else None,
             description=mutation.description if mutation else None,
+            input_tokens=usage.input_tokens if usage else 0,
+            output_tokens=usage.output_tokens if usage else 0,
         ),
     )
 

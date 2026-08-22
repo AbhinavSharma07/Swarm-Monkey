@@ -1,3 +1,4 @@
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -41,7 +42,7 @@ def test_gh_available_reflects_shutil_which(monkeypatch):
 def test_push_branch_returns_true_on_success(tmp_path, monkeypatch):
     calls = []
 
-    def fake_run(args, cwd, capture_output, text):
+    def fake_run(args, cwd, capture_output, text, timeout=None):
         calls.append((args, cwd))
         return _FakeCompletedProcess(returncode=0)
 
@@ -65,7 +66,7 @@ def test_push_branch_returns_false_on_failure(tmp_path, monkeypatch):
 def test_open_pull_request_returns_url_on_success(tmp_path, monkeypatch):
     calls = []
 
-    def fake_run(args, cwd, capture_output, text):
+    def fake_run(args, cwd, capture_output, text, timeout=None):
         calls.append(args)
         return _FakeCompletedProcess(returncode=0, stdout="https://github.com/x/y/pull/1\n")
 
@@ -85,6 +86,26 @@ def test_open_pull_request_returns_none_on_failure(tmp_path, monkeypatch):
     monkeypatch.setattr(
         github_pr.subprocess, "run", lambda *a, **k: _FakeCompletedProcess(returncode=1, stdout="")
     )
+    sandbox = _FakeSandbox(branch="qa-swarm/fix-run1", worktree_path=tmp_path)
+
+    assert github_pr.open_pull_request(sandbox, _mutation(tmp_path / "calc.py")) is None
+
+
+def test_push_branch_returns_false_on_timeout(tmp_path, monkeypatch):
+    def fake_run(*a, **k):
+        raise subprocess.TimeoutExpired(cmd="git push", timeout=k.get("timeout"))
+
+    monkeypatch.setattr(github_pr.subprocess, "run", fake_run)
+    sandbox = _FakeSandbox(branch="qa-swarm/fix-run1", worktree_path=tmp_path)
+
+    assert github_pr.push_branch(sandbox) is False
+
+
+def test_open_pull_request_returns_none_on_timeout(tmp_path, monkeypatch):
+    def fake_run(*a, **k):
+        raise subprocess.TimeoutExpired(cmd="gh pr create", timeout=k.get("timeout"))
+
+    monkeypatch.setattr(github_pr.subprocess, "run", fake_run)
     sandbox = _FakeSandbox(branch="qa-swarm/fix-run1", worktree_path=tmp_path)
 
     assert github_pr.open_pull_request(sandbox, _mutation(tmp_path / "calc.py")) is None

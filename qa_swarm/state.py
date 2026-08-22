@@ -7,6 +7,7 @@ from typing import TypedDict
 from qa_swarm.agents.aggressor import Mutation
 from qa_swarm.agents.detective import DetectiveResult
 from qa_swarm.agents.surgeon import PatchAttempt
+from qa_swarm.cost import TokenUsage
 from qa_swarm.sandbox import Sandbox
 from qa_swarm.telemetry import TelemetryConfig
 
@@ -20,6 +21,7 @@ class SwarmState(TypedDict, total=False):
     regression_dir: Path
     exclude_files: frozenset[str] | None
     telemetry_config: TelemetryConfig | None
+    token_usage: TokenUsage
     max_aggressor_retries: int
     max_surgeon_retries: int
     max_patch_change_ratio: float

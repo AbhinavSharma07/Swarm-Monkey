@@ -39,6 +39,7 @@ def generate_patch(
     test_report: TestReport,
     regression_test: RegressionTest,
     previous_attempt: PatchAttempt | None = None,
+    usage=None,
 ) -> str:
     llm = get_llm()
     context = (
@@ -55,7 +56,7 @@ def generate_patch(
             f"Failure after that attempt:\n```\n{previous_attempt.test_report.output}\n```\n"
         )
     response = invoke_with_retry(
-        llm, [SystemMessage(content=SURGEON_SYSTEM_PROMPT), HumanMessage(content=context)]
+        llm, [SystemMessage(content=SURGEON_SYSTEM_PROMPT), HumanMessage(content=context)], usage=usage
     )
     return _strip_code_fences(response.content)
 
@@ -105,11 +106,12 @@ def heal(
     regression_test: RegressionTest,
     max_retries: int,
     max_change_ratio: float = 0.5,
+    usage=None,
 ) -> PatchAttempt:
     attempt: PatchAttempt | None = None
     current_report = test_report
     for _ in range(max_retries):
-        patched_source = generate_patch(mutation, current_report, regression_test, attempt)
+        patched_source = generate_patch(mutation, current_report, regression_test, attempt, usage=usage)
         attempt = apply_and_validate(
             worktree_root, mutation, test_target, regression_test, patched_source, max_change_ratio
         )
